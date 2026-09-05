@@ -1,0 +1,144 @@
+{
+  "info": {
+    "_postman_id": "a8512545-318b-4a4d-b5ee-8a4110fbe55a",
+    "name": "Tamken API",
+    "description": "Import this collection, set baseUrl if needed, then run requests in the numbered order. Responses use { success, data, timestamp }, so test scripts save values from data. For Socket.IO use namespace {{socketUrl}}/chat and send auth: { token: customerAccessToken }, then events joinRoom and sendMessage.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:3000" },
+    { "key": "socketUrl", "value": "http://localhost:3000" },
+    { "key": "password", "value": "StrongP@ss123" },
+    { "key": "customerEmail", "value": "" },
+    { "key": "providerEmail", "value": "" },
+    { "key": "customerAccessToken", "value": "" },
+    { "key": "providerAccessToken", "value": "" },
+    { "key": "adminAccessToken", "value": "" },
+    { "key": "providerId", "value": "" },
+    { "key": "jobId", "value": "" },
+    { "key": "refreshToken", "value": "" },
+    { "key": "verificationDocumentId", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "01 Auth",
+      "item": [
+        {
+          "name": "01 Register Customer",
+          "event": [
+            { "listen": "prerequest", "script": { "exec": ["pm.collectionVariables.set('customerEmail', `customer.${Date.now()}@example.com`);"] } },
+            { "listen": "test", "script": { "exec": ["pm.test('Created', () => pm.response.to.have.status(201));", "const body = pm.response.json().data;", "pm.collectionVariables.set('customerAccessToken', body.accessToken);", "pm.collectionVariables.set('refreshToken', body.refreshToken);"] } }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"{{customerEmail}}\",\n  \"password\": \"{{password}}\",\n  \"firstName\": \"Customer\",\n  \"lastName\": \"Test\",\n  \"phone\": \"+201000000001\",\n  \"role\": \"customer\"\n}" },
+            "url": "{{baseUrl}}/auth/register"
+          }
+        },
+        {
+          "name": "02 Register Provider",
+          "event": [
+            { "listen": "prerequest", "script": { "exec": ["pm.collectionVariables.set('providerEmail', `provider.${Date.now()}@example.com`);"] } },
+            { "listen": "test", "script": { "exec": ["pm.test('Created', () => pm.response.to.have.status(201));", "const body = pm.response.json().data;", "pm.collectionVariables.set('providerAccessToken', body.accessToken);"] } }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"{{providerEmail}}\",\n  \"password\": \"{{password}}\",\n  \"firstName\": \"Provider\",\n  \"lastName\": \"Test\",\n  \"phone\": \"+201000000002\",\n  \"role\": \"provider\"\n}" },
+            "url": "{{baseUrl}}/auth/register"
+          }
+        },
+        {
+          "name": "03 Login Customer",
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('OK', () => pm.response.to.have.status(200));", "const body = pm.response.json().data;", "pm.collectionVariables.set('customerAccessToken', body.accessToken);", "pm.collectionVariables.set('refreshToken', body.refreshToken);"] } }],
+          "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"email\": \"{{customerEmail}}\",\n  \"password\": \"{{password}}\"\n}" }, "url": "{{baseUrl}}/auth/login" }
+        },
+        {
+          "name": "04 Refresh Customer Token",
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('OK', () => pm.response.to.have.status(200));", "const body = pm.response.json().data;", "pm.collectionVariables.set('customerAccessToken', body.accessToken);", "pm.collectionVariables.set('refreshToken', body.refreshToken);"] } }],
+          "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}" }, "url": "{{baseUrl}}/auth/refresh" }
+        }
+      ]
+    },
+    {
+      "name": "02 Providers and Discovery",
+      "item": [
+        {
+          "name": "01 Create My Provider Profile",
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('Created', () => pm.response.to.have.status(201));", "pm.collectionVariables.set('providerId', pm.response.json().data.id);"] } }],
+          "request": { "method": "POST", "header": [{ "key": "Authorization", "value": "Bearer {{providerAccessToken}}" }, { "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"businessName\": \"Provider Test Services\",\n  \"bio\": \"Experienced professional provider for Postman integration tests.\",\n  \"category\": \"plumbing\",\n  \"categories\": [\"plumbing\"],\n  \"hourlyRate\": 150,\n  \"city\": \"Cairo\",\n  \"latitude\": 30.0444,\n  \"longitude\": 31.2357\n}" }, "url": "{{baseUrl}}/users/me/provider-profile" }
+        },
+        {
+          "name": "02 Public Discovery Search",
+          "request": { "method": "GET", "url": "{{baseUrl}}/search?category=plumbing&city=Cairo&minRating=0&maxPrice=200&page=1&limit=20" }
+        },
+        {
+          "name": "03 Public Provider Details",
+          "request": { "method": "GET", "url": "{{baseUrl}}/providers/{{providerId}}" }
+        }
+      ]
+    },
+    {
+      "name": "03 Jobs",
+      "item": [
+        {
+          "name": "01 Customer Creates Request",
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('Created', () => pm.response.to.have.status(201));", "pm.collectionVariables.set('jobId', pm.response.json().data.id);"] } }],
+          "request": { "method": "POST", "header": [{ "key": "Authorization", "value": "Bearer {{customerAccessToken}}" }, { "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"title\": \"Fix kitchen sink leak\",\n  \"description\": \"The kitchen sink has been leaking for two days and needs urgent repair.\",\n  \"category\": \"plumbing\",\n  \"budget\": 150,\n  \"scheduledAt\": \"2026-10-10T14:00:00Z\"\n}" }, "url": "{{baseUrl}}/providers/{{providerId}}/request" }
+        },
+        {
+          "name": "02 Provider Accepts Request",
+          "request": { "method": "PATCH", "header": [{ "key": "Authorization", "value": "Bearer {{providerAccessToken}}" }, { "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{ \"status\": \"accepted\" }" }, "url": "{{baseUrl}}/requests/{{jobId}}/status" }
+        },
+        {
+          "name": "03 Provider Starts Request",
+          "request": { "method": "PATCH", "header": [{ "key": "Authorization", "value": "Bearer {{providerAccessToken}}" }, { "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{ \"status\": \"in_progress\" }" }, "url": "{{baseUrl}}/requests/{{jobId}}/status" }
+        },
+        {
+          "name": "04 Provider Completes Request",
+          "request": { "method": "PATCH", "header": [{ "key": "Authorization", "value": "Bearer {{providerAccessToken}}" }, { "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{ \"status\": \"completed\" }" }, "url": "{{baseUrl}}/requests/{{jobId}}/status" }
+        },
+        {
+          "name": "05 Customer Reads Own Request",
+          "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{customerAccessToken}}" }], "url": "{{baseUrl}}/requests/{{jobId}}" }
+        }
+      ]
+    },
+    {
+      "name": "04 Messaging and Reviews",
+      "item": [
+        {
+          "name": "01 Customer Chat History",
+          "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{customerAccessToken}}" }], "url": "{{baseUrl}}/messages/{{jobId}}?page=1&limit=50" }
+        },
+        {
+          "name": "02 Customer Creates Review",
+          "request": { "method": "POST", "header": [{ "key": "Authorization", "value": "Bearer {{customerAccessToken}}" }, { "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"jobId\": \"{{jobId}}\",\n  \"rating\": 5,\n  \"comment\": \"Excellent work and clear communication.\"\n}" }, "url": "{{baseUrl}}/reviews" }
+        },
+        {
+          "name": "03 Public Provider Reviews",
+          "request": { "method": "GET", "url": "{{baseUrl}}/reviews/{{providerId}}?page=1&limit=20" }
+        }
+      ]
+    },
+    {
+      "name": "05 Verification and Logout",
+      "item": [
+        {
+          "name": "01 Provider Submits Document",
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('Created', () => pm.response.to.have.status(201));", "pm.collectionVariables.set('verificationDocumentId', pm.response.json().data.id);"] } }],
+          "request": { "method": "POST", "header": [{ "key": "Authorization", "value": "Bearer {{providerAccessToken}}" }, { "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"documentType\": \"id_card\",\n  \"documentUrl\": \"https://example.com/documents/test-id.pdf\"\n}" }, "url": "{{baseUrl}}/verification/submit" }
+        },
+        {
+          "name": "02 Admin Reviews Document (seed an admin token first)",
+          "request": { "method": "PATCH", "header": [{ "key": "Authorization", "value": "Bearer {{adminAccessToken}}" }, { "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{ \"status\": \"approved\" }" }, "url": "{{baseUrl}}/verification/{{verificationDocumentId}}/review" }
+        },
+        {
+          "name": "03 Customer Logout",
+          "request": { "method": "POST", "header": [{ "key": "Authorization", "value": "Bearer {{customerAccessToken}}" }], "url": "{{baseUrl}}/auth/logout" }
+        }
+      ]
+    }
+  ]
+}
