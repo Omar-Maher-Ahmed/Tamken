@@ -5,11 +5,11 @@ import { AppConfigModule } from './config/config.module';
 import { DatabaseModule } from './database/database.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { ProvidersModule } from './modules/providers/providers.module';
-import { DiscoveryModule } from './modules/discovery/discovery.module';
-import { JobsModule } from './modules/jobs/jobs.module';
-import { MessagingModule } from './modules/messaging/messaging.module';
-import { ReviewsModule } from './modules/reviews/reviews.module';
-import { VerificationModule } from './modules/verification/verification.module';
+// import { DiscoveryModule } from './modules/discovery/discovery.module';
+// import { JobsModule } from './modules/jobs/jobs.module';
+// import { MessagingModule } from './modules/messaging/messaging.module';
+// import { ReviewsModule } from './modules/reviews/reviews.module';
+// import { VerificationModule } from './modules/verification/verification.module';
 import { JwtAuthGuard } from './shared/guards/jwt-auth.guard';
 import { RolesGuard } from './shared/guards/roles.guard';
 
@@ -30,11 +30,11 @@ import { RolesGuard } from './shared/guards/roles.guard';
     // ─── Feature Modules ───
     AuthModule,
     ProvidersModule,
-    DiscoveryModule,
-    JobsModule,
-    MessagingModule,
-    ReviewsModule,
-    VerificationModule,
+    // DiscoveryModule,
+    // JobsModule,
+    // MessagingModule,
+    // ReviewsModule,
+    // VerificationModule,
   ],
   providers: [
     // Apply JWT auth guard globally — use @Public() to opt out
