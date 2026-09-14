@@ -31,6 +31,13 @@ import * as Joi from 'joi';
           .valid('development', 'production', 'test')
           .default('development'),
         CORS_ORIGINS: Joi.string().default('http://localhost:3001'),
+
+        // LLM (Groq / Together / any OpenAI-compatible API)
+        LLM_API_KEY: Joi.string().allow('').default(''),
+        LLM_API_URL: Joi.string().default('https://api.groq.com/openai/v1'),
+        LLM_MODEL: Joi.string().default('llama-3.3-70b-versatile'),
+        LLM_MAX_TOKENS: Joi.number().default(1024),
+        LLM_TEMPERATURE: Joi.number().default(0.3),
       }),
     }),
   ],

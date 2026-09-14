@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Tamken Chatbot Test Client</title>
+  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0d1117; color: #c9d1d9; height: 100vh; display: flex; flex-direction: column; }
+    .header { padding: 12px 20px; background: #161b22; border-bottom: 1px solid #30363d; display: flex; align-items: center; gap: 12px; }
+    .header h1 { font-size: 16px; color: #f0f6fc; }
+    .status { padding: 4px 10px; border-radius: 12px; font-size: 12px; font-weight: 500; }
+    .status.disconnected { background: #da3633; color: #fff; }
+    .status.connected { background: #238636; color: #fff; }
+    .setup { max-width: 500px; margin: 40px auto; padding: 24px; background: #161b22; border: 1px solid #30363d; border-radius: 8px; }
+    .setup h2 { margin-bottom: 16px; font-size: 18px; }
+    .setup label { display: block; margin-bottom: 4px; font-size: 13px; color: #8b949e; }
+    .setup input { width: 100%; padding: 8px 12px; margin-bottom: 12px; background: #0d1117; border: 1px solid #30363d; border-radius: 6px; color: #c9d1d9; font-size: 14px; }
+    .setup button { width: 100%; padding: 10px; background: #238636; color: #fff; border: none; border-radius: 6px; font-size: 14px; cursor: pointer; font-weight: 500; }
+    .setup button:hover { background: #2ea043; }
+    .setup button:disabled { background: #21262d; color: #484f58; cursor: not-allowed; }
+    .chat { display: none; flex: 1; flex-direction: column; }
+    .messages { flex: 1; overflow-y: auto; padding: 20px; }
+    .msg { max-width: 70%; margin-bottom: 12px; padding: 10px 14px; border-radius: 12px; font-size: 14px; line-height: 1.5; white-space: pre-wrap; word-wrap: break-word; }
+    .msg.user { background: #1f6feb; color: #fff; margin-left: auto; border-bottom-right-radius: 4px; }
+    .msg.assistant { background: #21262d; color: #c9d1d9; margin-right: auto; border-bottom-left-radius: 4px; border: 1px solid #30363d; }
+    .msg.system { background: transparent; color: #8b949e; text-align: center; font-size: 12px; margin: 8px auto; max-width: 90%; }
+    .msg.error { background: #da363322; color: #f85149; border: 1px solid #da363344; margin: 8px auto; max-width: 90%; }
+    .typing-indicator { padding: 0 20px; font-size: 12px; color: #8b949e; height: 18px; }
+    .input-area { display: flex; gap: 8px; padding: 12px 20px; background: #161b22; border-top: 1px solid #30363d; }
+    .input-area input { flex: 1; padding: 10px 14px; background: #0d1117; border: 1px solid #30363d; border-radius: 6px; color: #c9d1d9; font-size: 14px; }
+    .input-area button { padding: 10px 20px; background: #1f6feb; color: #fff; border: none; border-radius: 6px; cursor: pointer; font-weight: 500; }
+    .input-area button:hover { background: #388bfd; }
+    .input-area button:disabled { background: #21262d; color: #484f58; cursor: not-allowed; }
+    .session-bar { padding: 8px 20px; background: #0d1117; border-bottom: 1px solid #30363d; display: flex; align-items: center; gap: 8px; }
+    .session-bar span { font-size: 12px; color: #8b949e; }
+    .session-bar select { padding: 4px 8px; background: #161b22; border: 1px solid #30363d; border-radius: 4px; color: #c9d1d9; font-size: 12px; }
+    .session-bar button { padding: 4px 10px; background: #30363d; color: #c9d1d9; border: 1px solid #484f58; border-radius: 4px; font-size: 12px; cursor: pointer; }
+    .session-bar button:hover { background: #484f58; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>Tamken Chatbot</h1>
+    <span class="status disconnected" id="status">Disconnected</span>
+  </div>
+
+  <div class="setup" id="setup">
+    <h2>Connect to Chatbot</h2>
+    <label>API Base URL</label>
+    <input type="text" id="apiUrl" value="http://localhost:3000" placeholder="http://localhost:3000" />
+    <label>Email</label>
+    <input type="email" id="email" placeholder="user@example.com" />
+    <label>Password</label>
+    <input type="password" id="password" placeholder="Min 8 characters" />
+    <button id="loginBtn" onclick="login()">Login &amp; Connect</button>
+    <p id="loginError" style="color: #f85149; font-size: 13px; margin-top: 8px;"></p>
+  </div>
+
+  <div class="chat" id="chat">
+    <div class="session-bar">
+      <span>Session:</span>
+      <select id="sessionSelect" onchange="switchSession()">
+        <option value="">New conversation</option>
+      </select>
+      <button onclick="newSession()">+ New</button>
+      <button onclick="deleteSession()">Delete</button>
+      <button onclick="refreshSessions()">Refresh</button>
+    </div>
+    <div class="messages" id="messages"></div>
+    <div class="typing-indicator" id="typing"></div>
+    <div class="input-area">
+      <input type="text" id="userInput" placeholder="Type a message..." onkeydown="if(event.key==='Enter')send()" />
+      <button id="sendBtn" onclick="send()">Send</button>
+    </div>
+  </div>
+
+  <script>
+    let socket = null;
+    let jwt = '';
+    let currentSessionId = '';
+
+    function showLoginError(msg) {
+      document.getElementById('loginError').textContent = msg;
+    }
+
+    async function login() {
+      const apiUrl = document.getElementById('apiUrl').value.replace(/\/+$/, '');
+      const email = document.getElementById('email').value;
+      const password = document.getElementById('password').value;
+
+      if (!email || !password) { showLoginError('Email and password required'); return; }
+
+      document.getElementById('loginBtn').disabled = true;
+      showLoginError('');
+
+      try {
+        const res = await fetch(`${apiUrl}/auth/login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password }),
+        });
+
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.message || `Login failed (${res.status})`);
+        }
+
+        const body = await res.json();
+        jwt = body.data?.accessToken || body.accessToken;
+
+        if (!jwt) throw new Error('No accessToken in response');
+
+        document.getElementById('setup').style.display = 'none';
+        document.getElementById('chat').style.display = 'flex';
+        connectSocket(apiUrl);
+      } catch (e) {
+        showLoginError(e.message);
+      } finally {
+        document.getElementById('loginBtn').disabled = false;
+      }
+    }
+
+    function connectSocket(apiUrl) {
+      socket = io(`${apiUrl}/chatbot`, {
+        auth: { token: jwt },
+        transports: ['websocket', 'polling'],
+      });
+
+      socket.on('connect', () => {
+        document.getElementById('status').textContent = 'Connected';
+        document.getElementById('status').className = 'status connected';
+        appendMessage('system', 'Connected to Tamken Chatbot');
+        loadSessions();
+      });
+
+      socket.on('disconnect', () => {
+        document.getElementById('status').textContent = 'Disconnected';
+        document.getElementById('status').className = 'status disconnected';
+        appendMessage('system', 'Disconnected from server');
+      });
+
+      socket.on('connect_error', (err) => {
+        appendMessage('error', `Connection error: ${err.message}`);
+      });
+
+      socket.on('newMessage', (data) => {
+        document.getElementById('sendBtn').disabled = false;
+        appendMessage('assistant', data.content);
+        currentSessionId = data.sessionId;
+        refreshSessions();
+      });
+
+      socket.on('typing', (data) => {
+        document.getElementById('typing').textContent = data.active ? 'Bot is thinking...' : '';
+      });
+
+      socket.on('error', (data) => {
+        document.getElementById('sendBtn').disabled = false;
+        appendMessage('error', data.message || 'Unknown error');
+      });
+
+      socket.on('sessions', (sessions) => {
+        const select = document.getElementById('sessionSelect');
+        const current = select.value;
+        select.innerHTML = '<option value="">New conversation</option>';
+        (sessions || []).forEach((s) => {
+          const opt = document.createElement('option');
+          opt.value = s.id;
+          opt.textContent = s.title || s.id.slice(0, 8);
+          select.appendChild(opt);
+        });
+        select.value = currentSessionId || current || '';
+      });
+
+      socket.on('history', (data) => {
+        document.getElementById('messages').innerHTML = '';
+        (data.data || []).forEach((m) => {
+          appendMessage(m.role, m.content);
+        });
+      });
+
+      socket.on('sessionDeleted', () => {
+        currentSessionId = '';
+        loadSessions();
+      });
+    }
+
+    function send() {
+      const input = document.getElementById('userInput');
+      const content = input.value.trim();
+      if (!content || !socket) return;
+
+      socket.emit('sendMessage', { content, sessionId: currentSessionId || undefined });
+      appendMessage('user', content);
+      document.getElementById('sendBtn').disabled = true;
+      input.value = '';
+    }
+
+    function appendMessage(role, content) {
+      const div = document.createElement('div');
+      div.className = `msg ${role}`;
+      div.textContent = content;
+      document.getElementById('messages').appendChild(div);
+      div.scrollIntoView({ behavior: 'smooth' });
+    }
+
+    function newSession() {
+      currentSessionId = '';
+      document.getElementById('sessionSelect').value = '';
+      document.getElementById('messages').innerHTML = '';
+      appendMessage('system', 'New conversation started');
+    }
+
+    function switchSession() {
+      const select = document.getElementById('sessionSelect');
+      const sessionId = select.value;
+
+      if (!sessionId) {
+        currentSessionId = '';
+        document.getElementById('messages').innerHTML = '';
+        appendMessage('system', 'New conversation');
+        return;
+      }
+
+      currentSessionId = sessionId;
+      socket.emit('getHistory', { sessionId });
+    }
+
+    function deleteSession() {
+      if (!currentSessionId) return;
+      socket.emit('deleteSession', { sessionId: currentSessionId });
+    }
+
+    function loadSessions() {
+      if (socket) socket.emit('getSessions');
+    }
+
+    function refreshSessions() {
+      loadSessions();
+    }
+  </script>
+</body>
+</html>

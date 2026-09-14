@@ -51,6 +51,7 @@ async function bootstrap() {
     .addTag('Messaging', 'Real-time chat (WebSocket + REST)')
     .addTag('Reviews', 'Ratings & reviews')
     .addTag('Verification', 'Provider document verification')
+    .addTag('Chatbot', 'AI-powered assistant (WebSocket /chatbot + REST)')
     .build();
 
   const document = SwaggerModule.createDocument(app, swaggerConfig);
